@@ -1,0 +1,6 @@
+general:
+  version: 0.0.1
+cache:
+  host: "localhost"
+  port: "6379"
+  psw: ""
