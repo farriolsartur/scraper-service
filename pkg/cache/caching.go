@@ -21,12 +21,12 @@ const (
 	baseDelay  = 2 * time.Second
 )
 
-// RedisCache wraps the Redis client with additional methods
+// RedisCache wraps the Redis client with additional methods.
 type RedisCache struct {
 	client *redis.Client
 }
 
-// GetInstance returns the singleton instance of RedisCache
+// GetInstance returns the singleton instance of RedisCache.
 func GetInstance() *RedisCache {
 	once.Do(func() {
 		client, err := connectWithRetry()
@@ -40,7 +40,7 @@ func GetInstance() *RedisCache {
 
 func connectWithRetry() (*redis.Client, error) {
 	options := &redis.Options{
-		Addr:     "localhost:6379", // Update with your Redis configuration
+		Addr:     "localhost:6379", // Update with your Redis configuration.
 		Password: "",
 		DB:       0,
 	}
@@ -63,7 +63,7 @@ func connectWithRetry() (*redis.Client, error) {
 	return nil, fmt.Errorf("failed to connect after %d attempts: %w", maxRetries, err)
 }
 
-// Exists checks if a key exists in Redis
+// Exists checks if a key exists in Redis.
 func (rc *RedisCache) Exists(ctx context.Context, key string) (bool, error) {
 	result, err := rc.client.Exists(ctx, key).Result()
 	if err != nil {
@@ -72,7 +72,7 @@ func (rc *RedisCache) Exists(ctx context.Context, key string) (bool, error) {
 	return result > 0, nil
 }
 
-// Get retrieves and deserializes a value from Redis
+// Get retrieves and deserializes a value from Redis.
 func (rc *RedisCache) Get(ctx context.Context, key string, target interface{}) error {
 	data, err := rc.client.Get(ctx, key).Bytes()
 	if err != nil {
@@ -89,7 +89,7 @@ func (rc *RedisCache) Get(ctx context.Context, key string, target interface{}) e
 	return nil
 }
 
-// Save serializes and stores a value in Redis
+// Save serializes and stores a value in Redis.
 func (rc *RedisCache) Save(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
 	data, err := json.Marshal(value)
 	if err != nil {
@@ -103,7 +103,7 @@ func (rc *RedisCache) Save(ctx context.Context, key string, value interface{}, e
 	return nil
 }
 
-// Push appends a value to a Redis list
+// Push appends a value to a Redis list.
 func (rc *RedisCache) Push(ctx context.Context, key string, value interface{}) error {
 	data, err := json.Marshal(value)
 	if err != nil {
@@ -117,7 +117,23 @@ func (rc *RedisCache) Push(ctx context.Context, key string, value interface{}) e
 	return nil
 }
 
-// Close closes the Redis connection
+// XAdd adds an entry to a Redis stream. This method guarantees that the message
+// will be persisted until it is consumed.
+func (rc *RedisCache) XAdd(ctx context.Context, args *redis.XAddArgs) (string, error) {
+	return rc.client.XAdd(ctx, args).Result()
+}
+
+// RunScript runs the given Lua script with the specified keys and arguments.
+func (rc *RedisCache) RunScript(ctx context.Context, script *redis.Script, keys []string, args ...interface{}) (interface{}, error) {
+	return script.Run(ctx, rc.client, keys, args...).Result()
+}
+
+// IncrBy increments a key by the specified value.
+func (rc *RedisCache) IncrBy(ctx context.Context, key string, increment int64) (int64, error) {
+	return rc.client.IncrBy(ctx, key, increment).Result()
+}
+
+// Close closes the Redis connection.
 func (rc *RedisCache) Close() error {
 	if rc.client != nil {
 		return rc.client.Close()
