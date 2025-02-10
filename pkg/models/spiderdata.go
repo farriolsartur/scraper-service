@@ -7,9 +7,7 @@ type Link struct {
 }
 
 type OutputNotification struct {
-	ItemID              string
-	SpiderID            string
-	RemainingSpidersIDs []string
+	ItemID string
 }
 
 type MathomOffer struct {

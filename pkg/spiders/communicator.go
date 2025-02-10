@@ -37,7 +37,6 @@ func (c *Communicator) SendLink(ctx context.Context, link models.Link) error {
 
 	// Send the link to every output channel.
 	for _, ch := range c.OutputLinkChannels {
-		// This send is blocking; adjust with a select or goroutine if needed.
 		ch <- link
 	}
 	return nil
