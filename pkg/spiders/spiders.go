@@ -7,12 +7,18 @@ import (
 	"scraper-service/pkg/models"
 )
 
-type SpiderType int
+type SpiderType int // Spider name
+type SpiderKind int // Static or dynamic
 
 const (
 	MathomLink SpiderType = iota
 	MathomOffer
 	BGG
+)
+
+const (
+	Static SpiderKind = iota
+	Dynamic
 )
 
 type Spider interface {

@@ -15,11 +15,16 @@ type MergerCache struct {
 }
 
 // NewMergerCache is a factory method to create a new MergerCache with the given channel.
-func NewMergerCache(channel string) *MergerCache {
-	return &MergerCache{
-		Cache:   GetInstance(),
-		Channel: channel,
+func NewMergerCache(channel string) (*MergerCache, error) {
+	cacheInstance, err := GetInstance()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Redis instance: %w", err)
 	}
+
+	return &MergerCache{
+		Cache:   cacheInstance,
+		Channel: channel,
+	}, nil
 }
 
 // decrAndNotifyScript is a Lua script that atomically decrements the counter stored at a given key.

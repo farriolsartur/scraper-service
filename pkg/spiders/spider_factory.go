@@ -1,59 +1,58 @@
 package spiders
 
 import (
+	"fmt"
 	"time"
 
 	"scraper-service/pkg/models"
 )
 
-// NewStaticSpider creates a new static spider with optional arguments.
-func NewStaticSpider(spiderType SpiderType, url string, comm *Communicator, args ...interface{}) Spider {
-	var waitTime time.Duration
+type StaticSpiderConstructor func(url string, comm *Communicator, waitTime time.Duration) Spider
+type DynamicSpiderConstructor func(input chan models.Link, comm *Communicator, waitTime time.Duration) Spider
 
-	// Extract waitTime if provided
-	for _, arg := range args {
-		if v, ok := arg.(time.Duration); ok {
-			waitTime = v
-		}
-	}
+// --- Static Spider Constructors ---
 
-	switch spiderType {
-	case MathomLink:
+var StaticSpiderConstructors = map[SpiderType]StaticSpiderConstructor{
+	MathomLink: func(url string, comm *Communicator, waitTime time.Duration) Spider {
 		return &MathomLinkSpider{
 			Communicator: comm,
 			URL:          url,
 			WaitTime:     waitTime,
 		}
-	default:
-		return nil
-	}
+	},
 }
 
-// NewDynamicSpider creates a new dynamic spider with optional arguments.
-func NewDynamicSpider(spiderType SpiderType, input chan models.Link, comm *Communicator, args ...interface{}) Spider {
-	var waitTime time.Duration
-
-	// Extract waitTime if provided
-	for _, arg := range args {
-		if v, ok := arg.(time.Duration); ok {
-			waitTime = v
-		}
+func NewStaticSpider(spiderType SpiderType, url string, comm *Communicator, waitTime time.Duration) (Spider, error) {
+	constructor, ok := StaticSpiderConstructors[spiderType]
+	if !ok {
+		return nil, fmt.Errorf("no static spider constructor for spider type %d", spiderType)
 	}
+	return constructor(url, comm, waitTime), nil
+}
 
-	switch spiderType {
-	case MathomOffer:
+// --- Dynamic Spider Constructors ---
+
+var DynamicSpiderConstructors = map[SpiderType]DynamicSpiderConstructor{
+	MathomOffer: func(input chan models.Link, comm *Communicator, waitTime time.Duration) Spider {
 		return &MathomOfferSpider{
 			Communicator:     comm,
 			InputLinkChannel: input,
 			WaitTime:         waitTime,
 		}
-	case BGG:
+	},
+	BGG: func(input chan models.Link, comm *Communicator, waitTime time.Duration) Spider {
 		return &BoardGameGeekSpider{
 			Communicator:     comm,
 			InputLinkChannel: input,
 			WaitTime:         waitTime,
 		}
-	default:
-		return nil
+	},
+}
+
+func NewDynamicSpider(spiderType SpiderType, input chan models.Link, comm *Communicator, waitTime time.Duration) (Spider, error) {
+	constructor, ok := DynamicSpiderConstructors[spiderType]
+	if !ok {
+		return nil, fmt.Errorf("no dynamic spider constructor for spider type %d", spiderType)
 	}
+	return constructor(input, comm, waitTime), nil
 }

@@ -2,11 +2,12 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"scraper-service/pkg/models"
 	"scraper-service/pkg/spiders"
+	"time"
 )
 
-// PipelineManager will build and run your pipeline.
 type PipelineManager struct {
 	Spiders             map[string]spiders.Spider
 	inputChannels       map[string]chan models.Link // for dynamic spiders
@@ -14,7 +15,6 @@ type PipelineManager struct {
 	notificationChannel string
 }
 
-// NewPipelineManager creates a new manager given a pipeline configuration.
 func NewPipelineManager(config []PipelineNode, notificationChannel string) *PipelineManager {
 	return &PipelineManager{
 		Spiders:             make(map[string]spiders.Spider),
@@ -24,43 +24,47 @@ func NewPipelineManager(config []PipelineNode, notificationChannel string) *Pipe
 	}
 }
 
-// BuildPipeline creates spiders and wires their communication channels.
-func (pm *PipelineManager) BuildPipeline() {
+func (pm *PipelineManager) BuildPipeline() error {
 	// First pass: create channels for dynamic spiders.
 	for _, node := range pm.config {
-		// Static spiders (like MathomLink) don't need an input channel.
-		if node.Type != spiders.MathomLink {
+		if node.Kind == spiders.Dynamic {
 			pm.inputChannels[node.ID] = make(chan models.Link, 100)
 		}
 	}
 
 	// Second pass: create each spider and set up its communicator.
 	for _, node := range pm.config {
-		// Build the list of output channels from this spider.
 		var childChannels []chan models.Link
+		// Collect channels for designated child spiders.
 		for _, childID := range node.ChildIDs {
 			if ch, ok := pm.inputChannels[childID]; ok {
 				childChannels = append(childChannels, ch)
 			}
 		}
-		// Create a communicator with the output channels for this node.
-		comm := spiders.NewCommunicator(pm.notificationChannel, len(childChannels))
-		// Overwrite the channels set by the factory if needed.
+
+		// Create a communicator with the number of output channels equal to the number of child spiders.
+		comm, err := spiders.NewCommunicator(pm.notificationChannel, len(childChannels))
+		if err != nil {
+			return fmt.Errorf("failed to create communicator for node %s: %w", node.ID, err)
+		}
 		comm.OutputLinkChannels = childChannels
 
-		// Create the spider
-		// TODO create map of dynamic and static spiders
 		var sp spiders.Spider
-		if node.Type == spiders.MathomLink {
-			// Static spider: pass URL and waitTime.
-			sp = spiders.NewStaticSpider(node.Type, node.URL, comm, node.WaitTime)
+		if node.Kind == spiders.Static {
+			sp, err = spiders.NewStaticSpider(node.Type, node.URL, comm, (time.Duration(node.WaitTime))*time.Second)
+			if err != nil {
+				return fmt.Errorf("failed to create static spider for node %s: %w", node.ID, err)
+			}
 		} else {
-			// Dynamic spider: pass the pre-created input channel.
 			inputCh := pm.inputChannels[node.ID]
-			sp = spiders.NewDynamicSpider(node.Type, inputCh, comm, node.WaitTime)
+			sp, err = spiders.NewDynamicSpider(node.Type, inputCh, comm, (time.Duration(node.WaitTime))*time.Second)
+			if err != nil {
+				return fmt.Errorf("failed to create dynamic spider for node %s: %w", node.ID, err)
+			}
 		}
 		pm.Spiders[node.ID] = sp
 	}
+	return nil
 }
 
 func (pm *PipelineManager) RunAll() {

@@ -26,22 +26,30 @@ type RedisCache struct {
 	client *redis.Client
 }
 
-// GetInstance returns the singleton instance of RedisCache.
-func GetInstance() *RedisCache {
+func GetInstance() (*RedisCache, error) {
+	if redisClient == nil {
+		return nil, errors.New("Redis cache is not initialized. Call InitRedisCache first")
+	}
+	return redisClient, nil
+}
+
+func InitRedisCache(host, port, password string) error {
 	once.Do(func() {
-		client, err := connectWithRetry()
+		client, err := connectWithRetry(host, port, password)
 		if err != nil {
 			panic(fmt.Sprintf("Failed to initialize Redis client: %v", err))
 		}
 		redisClient = &RedisCache{client: client}
 	})
-	return redisClient
+	return nil
 }
 
-func connectWithRetry() (*redis.Client, error) {
+func connectWithRetry(host, port, password string) (*redis.Client, error) {
+	redisAddr := fmt.Sprintf("%s:%s", host, port)
+
 	options := &redis.Options{
-		Addr:     "localhost:6379", // Update with your Redis configuration.
-		Password: "",
+		Addr:     redisAddr,
+		Password: password, // Use provided password
 		DB:       0,
 	}
 

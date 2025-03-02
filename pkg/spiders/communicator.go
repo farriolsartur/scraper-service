@@ -14,16 +14,21 @@ type Communicator struct {
 	OutputLinkChannels []chan models.Link
 }
 
-// NewCommunicator creates a new Communicator with the given notification channel and number of output channels.
-func NewCommunicator(notificationChannel string, numOutputChannels int) *Communicator {
+func NewCommunicator(notificationChannel string, numOutputChannels int) (*Communicator, error) {
+	mergerCache, err := cache.NewMergerCache(notificationChannel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create MergerCache: %w", err)
+	}
+
 	channels := make([]chan models.Link, numOutputChannels)
 	for i := range channels {
 		channels[i] = make(chan models.Link, 100) // buffered channel with capacity 100; adjust as needed.
 	}
+
 	return &Communicator{
-		MergerCache:        cache.NewMergerCache(notificationChannel),
+		MergerCache:        mergerCache,
 		OutputLinkChannels: channels,
-	}
+	}, nil
 }
 
 // SendLink sends a link to all output channels and increments the Redis counter for the item.
